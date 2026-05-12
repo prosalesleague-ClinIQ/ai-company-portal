@@ -3,9 +3,19 @@ import { notFound } from "next/navigation";
 import { getManifest } from "@/lib/manifest";
 import { Card, CardBody, CardHeader, Badge } from "@/components/ui/card";
 
+// Deployment-size guard: with 14k+ leads, prerendering every detail page
+// blew past Vercel's deployment artifact limit (build OK, deploy failed at
+// packaging). We now prerender only the top 200 by lead_score; the rest
+// render on-demand via dynamicParams. /leads still shows the full count
+// because the index page reads the manifest directly.
+export const dynamicParams = true;
+
 export async function generateStaticParams() {
   const m = await getManifest();
-  return m.leads.map((l) => ({ slug: l.id }));
+  const top = [...m.leads]
+    .sort((a, b) => (b.lead_score ?? 0) - (a.lead_score ?? 0))
+    .slice(0, 200);
+  return top.map((l) => ({ slug: l.id }));
 }
 
 export default async function LeadDetailPage({
