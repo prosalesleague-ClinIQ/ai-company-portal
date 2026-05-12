@@ -122,6 +122,26 @@ export type Approval = {
   link?: string;
 };
 
+export type KBDoc = {
+  slug: string;
+  section: string;
+  section_label: string;
+  title: string;
+  description: string;
+  voice_safe: boolean;
+  email_safe: boolean;
+  provider_only: boolean;
+  compliance_pre_scrubbed: boolean;
+  counsel_review_required: boolean;
+  source_cited: string[];
+  composed_by: string[];
+  last_reviewed: string;
+  next_review: string;
+  word_count: number;
+  path: string;
+  body_html: string;
+};
+
 export type Manifest = {
   version: string;
   built_at: string;
@@ -133,6 +153,10 @@ export type Manifest = {
     suppliers: number;
     crons: number;
     approvals: number;
+    kb_docs: number;
+    kb_sections: number;
+    kb_words: number;
+    kb_section_counts: Record<string, number>;
     supplier_categories: Record<string, number>;
     supplier_tiers: Record<string, number>;
   };
@@ -143,6 +167,7 @@ export type Manifest = {
   suppliers: Supplier[];
   crons: Cron[];
   approvals: Approval[];
+  kb_docs: KBDoc[];
 };
 
 let cached: Manifest | null = null;

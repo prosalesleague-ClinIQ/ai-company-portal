@@ -140,6 +140,26 @@ type CronRecord = {
   status: string;
 };
 
+type KBDocRecord = {
+  slug: string;
+  section: string;
+  section_label: string;
+  title: string;
+  description: string;
+  voice_safe: boolean;
+  email_safe: boolean;
+  provider_only: boolean;
+  compliance_pre_scrubbed: boolean;
+  counsel_review_required: boolean;
+  source_cited: string[];
+  composed_by: string[];
+  last_reviewed: string;
+  next_review: string;
+  word_count: number;
+  path: string;
+  body_html: string;
+};
+
 type ApprovalItem = {
   id: string;
   title: string;
@@ -164,6 +184,20 @@ const SUPPLIERS_ROOT = path.join(
   "supplier-discovery",
   "extracted",
 );
+const KB_ROOT = path.join(AI_COMPANY, "_Knowledge Base", "Matrix Domain");
+
+const KB_SECTION_LABELS: Record<string, string> = {
+  peptides: "Peptides",
+  "trt-hrt": "TRT / HRT",
+  "matrix-offerings": "Matrix Offerings",
+  "objection-handling": "Objection Handling",
+  "regulatory-framing": "Regulatory Framing",
+  "clinical-evidence": "Clinical Evidence",
+  "sales-playbook": "Sales Playbook",
+  "voice-snippets": "Voice Snippets",
+  "compliance-safe-phrasing": "Compliance-Safe Phrasing",
+  root: "Overview",
+};
 
 /** Map CSV filename → category key + display label */
 const SUPPLIER_CSV_CATEGORY: Record<string, string> = {
@@ -792,6 +826,135 @@ async function buildSuppliers(): Promise<SupplierRecord[]> {
   return out;
 }
 
+function kbDocSlug(filename: string): string {
+  return filename
+    .replace(/\.md$/, "")
+    .toLowerCase()
+    .replace(/^\d+\s*-\s*/, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function asBool(v: unknown): boolean {
+  if (v === true) return true;
+  if (typeof v === "string") {
+    const s = v.toLowerCase().trim();
+    return s === "yes" || s === "true" || s === "y";
+  }
+  return false;
+}
+
+function asStringArray(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(String);
+  if (typeof v === "string" && v.trim()) return [v];
+  return [];
+}
+
+function extractFirstParagraph(content: string): string {
+  // Strip H1 first, then take the first non-blockquote prose paragraph.
+  const lines = content.split("\n");
+  const buf: string[] = [];
+  let inPara = false;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) {
+      if (inPara && buf.length) break;
+      continue;
+    }
+    if (line.startsWith("# ")) continue;
+    if (line.startsWith("> ")) {
+      if (!inPara) {
+        // Use blockquote as description if nothing else found yet.
+        const trimmed = line.replace(/^>\s*/, "").trim();
+        if (trimmed) return trimmed.slice(0, 500);
+      }
+      continue;
+    }
+    if (line.startsWith("---")) continue;
+    if (line.startsWith("|")) break;
+    inPara = true;
+    buf.push(line);
+  }
+  return buf.join(" ").slice(0, 500);
+}
+
+function extractH1(content: string, fallback: string): string {
+  const m = content.match(/^#\s+(.+)$/m);
+  if (m) return m[1].trim();
+  return fallback;
+}
+
+async function buildKBDocs(): Promise<KBDocRecord[]> {
+  const out: KBDocRecord[] = [];
+
+  async function walk(dir: string, section: string) {
+    let entries;
+    try {
+      entries = await fs.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name.startsWith(".")) continue;
+        await walk(full, e.name);
+      } else if (e.isFile() && e.name.endsWith(".md")) {
+        // Skip the top-level README — that's the section index, surfaced separately.
+        if (section === "root" && e.name.toLowerCase() === "00 - readme.md") continue;
+        const raw = await fs.readFile(full, "utf-8");
+        const { data, content } = (() => {
+          try {
+            const parsed = matter(raw);
+            return { data: parsed.data as Record<string, unknown>, content: parsed.content };
+          } catch {
+            return { data: {} as Record<string, unknown>, content: raw };
+          }
+        })();
+        const filenameBase = e.name.replace(/\.md$/, "");
+        const slug = kbDocSlug(e.name);
+        const title = extractH1(content, filenameBase);
+        const description = extractFirstParagraph(content);
+        const word_count = content.trim().split(/\s+/).filter(Boolean).length;
+        const body_html = await md2html(content);
+        out.push({
+          slug,
+          section,
+          section_label: KB_SECTION_LABELS[section] || section,
+          title,
+          description,
+          voice_safe: asBool(data.voice_safe),
+          email_safe: asBool(data.email_safe),
+          provider_only: asBool(data.provider_only),
+          compliance_pre_scrubbed: asBool(data.compliance_pre_scrubbed),
+          counsel_review_required: asBool(data.counsel_review_required),
+          source_cited: asStringArray(data.source_cited),
+          composed_by: asStringArray(data.composed_by),
+          last_reviewed: String(data.last_reviewed || ""),
+          next_review: String(data.next_review || ""),
+          word_count,
+          path: path.relative(AI_COMPANY, full),
+          body_html,
+        });
+      }
+    }
+  }
+
+  await walk(KB_ROOT, "root");
+  // Deduplicate slug collisions across sections by prefixing section.
+  const seen = new Map<string, number>();
+  for (const doc of out) {
+    const key = `${doc.section}/${doc.slug}`;
+    const n = (seen.get(key) || 0) + 1;
+    seen.set(key, n);
+    if (n > 1) doc.slug = `${doc.slug}-${n}`;
+  }
+  return out.sort((a, b) => {
+    if (a.section !== b.section) return a.section.localeCompare(b.section);
+    return a.title.localeCompare(b.title);
+  });
+}
+
 async function buildCrons(): Promise<CronRecord[]> {
   const out: CronRecord[] = [];
   let entries: string[] = [];
@@ -920,6 +1083,18 @@ async function main() {
   const crons = await buildCrons();
   console.log(`[manifest] read ${crons.length} crons`);
 
+  console.log("[manifest] reading Matrix Domain KB...");
+  const kb_docs = await buildKBDocs();
+  const kbSectionCounts: Record<string, number> = {};
+  let kbWordTotal = 0;
+  for (const d of kb_docs) {
+    kbSectionCounts[d.section] = (kbSectionCounts[d.section] || 0) + 1;
+    kbWordTotal += d.word_count;
+  }
+  console.log(
+    `[manifest] read ${kb_docs.length} KB docs across ${Object.keys(kbSectionCounts).length} sections (${kbWordTotal} words)`,
+  );
+
   const payload = {
     version: new Date().toISOString().slice(0, 19) + "Z",
     built_at: new Date().toISOString(),
@@ -931,6 +1106,10 @@ async function main() {
       suppliers: suppliers.length,
       crons: crons.length,
       approvals: APPROVALS_SEED.length,
+      kb_docs: kb_docs.length,
+      kb_sections: Object.keys(kbSectionCounts).length,
+      kb_words: kbWordTotal,
+      kb_section_counts: kbSectionCounts,
       supplier_categories: supplierCategoryCounts,
       supplier_tiers: supplierTierCounts,
     },
@@ -941,6 +1120,7 @@ async function main() {
     suppliers,
     crons,
     approvals: APPROVALS_SEED,
+    kb_docs,
   };
 
   await fs.mkdir(path.dirname(OUT_FILE), { recursive: true });

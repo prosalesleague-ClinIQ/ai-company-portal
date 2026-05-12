@@ -30,10 +30,15 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
         <StatCard label="Specialists" value={m.stats.skills} hint="across departments" />
         <StatCard label="Workflows" value={m.stats.workflows} hint="end-to-end chains" />
         <StatCard label="Departments" value={m.stats.departments} hint="active" />
+        <StatCard
+          label="KB Docs"
+          value={m.stats.kb_docs}
+          hint={`${m.stats.kb_words.toLocaleString()} words`}
+        />
         <StatCard label="Leads" value={m.stats.leads} hint="prospect rows" />
         <StatCard label="Suppliers" value={m.stats.suppliers} hint="qualified partners" />
         <StatCard label="Scheduled" value={m.stats.crons} hint="cron jobs" />
@@ -234,6 +239,51 @@ export default async function DashboardPage() {
                 ))}
               </tbody>
             </table>
+          </CardBody>
+        </Card>
+      </section>
+
+      <section>
+        <Card>
+          <CardHeader
+            title="Knowledge base sections"
+            subtitle={`${m.stats.kb_docs} docs · ${m.stats.kb_words.toLocaleString()} words across ${m.stats.kb_sections} sections — composed by Mia, outreach-writer, roleplay-coach, compliance-officer, sales-rep-certification-manager.`}
+            right={
+              <Link
+                href="/kb"
+                className="text-xs text-[var(--color-accent)] hover:underline"
+              >
+                Browse KB →
+              </Link>
+            }
+          />
+          <CardBody>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {Object.entries(m.stats.kb_section_counts || {})
+                .sort((a, b) => b[1] - a[1])
+                .map(([slug, count]) => {
+                  const label =
+                    m.kb_docs.find((d) => d.section === slug)?.section_label || slug;
+                  const words = m.kb_docs
+                    .filter((d) => d.section === slug)
+                    .reduce((a, d) => a + d.word_count, 0);
+                  return (
+                    <li key={slug}>
+                      <Link
+                        href={`/kb/${slug}`}
+                        className="block rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-subtle)] px-3 py-2 hover:border-[var(--color-accent)] hover:bg-[var(--color-bg-elevated)] transition-colors"
+                      >
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-sm font-medium">{label}</span>
+                          <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-subtle)] tabular-nums">
+                            {count} · {Math.round(words / 1000)}K
+                          </span>
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
+            </ul>
           </CardBody>
         </Card>
       </section>
