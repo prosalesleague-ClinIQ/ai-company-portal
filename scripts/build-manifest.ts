@@ -618,7 +618,7 @@ async function buildDepartments(
 
 async function buildLeads(): Promise<LeadRecord[]> {
   const out: LeadRecord[] = [];
-  const regions = ["norcal-q2-2026", "multistate-q2-q3-2026"];
+  const regions = ["norcal-q2-2026", "multistate-q2-q3-2026", "east-mountain-q3-2026"];
   for (const region of regions) {
     const dir = path.join(PROSPECTS_ROOT, region, "extracted");
     let files: string[] = [];
