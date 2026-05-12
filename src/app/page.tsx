@@ -15,6 +15,10 @@ export default async function DashboardPage() {
   const topLeads = [...m.leads]
     .sort((a, b) => b.lead_score - a.lead_score)
     .slice(0, 5);
+  // Top suppliers
+  const topSuppliers = [...m.suppliers]
+    .sort((a, b) => b.partnership_readiness_score - a.partnership_readiness_score)
+    .slice(0, 5);
 
   return (
     <div className="space-y-8">
@@ -26,11 +30,12 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         <StatCard label="Specialists" value={m.stats.skills} hint="across departments" />
         <StatCard label="Workflows" value={m.stats.workflows} hint="end-to-end chains" />
         <StatCard label="Departments" value={m.stats.departments} hint="active" />
         <StatCard label="Leads" value={m.stats.leads} hint="prospect rows" />
+        <StatCard label="Suppliers" value={m.stats.suppliers} hint="qualified partners" />
         <StatCard label="Scheduled" value={m.stats.crons} hint="cron jobs" />
         <StatCard label="Approvals" value={m.stats.approvals} hint="pending" />
       </section>
@@ -171,6 +176,69 @@ export default async function DashboardPage() {
           </CardBody>
         </Card>
 
+        <Card>
+          <CardHeader
+            title="Top scored suppliers"
+            subtitle={`From ${m.stats.suppliers} qualified partners`}
+            right={
+              <Link
+                href="/suppliers"
+                className="text-xs text-[var(--color-accent)] hover:underline"
+              >
+                View all →
+              </Link>
+            }
+          />
+          <CardBody className="p-0">
+            <table className="w-full text-sm">
+              <thead className="text-left text-[var(--color-text-subtle)] text-xs uppercase tracking-wider">
+                <tr className="border-b border-[var(--color-border)]">
+                  <th className="px-5 py-2.5 font-medium">Company</th>
+                  <th className="px-5 py-2.5 font-medium">Location</th>
+                  <th className="px-5 py-2.5 font-medium">Tier</th>
+                  <th className="px-5 py-2.5 font-medium text-right tabular-nums">Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {topSuppliers.map((s) => (
+                  <tr
+                    key={s.id}
+                    className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg-subtle)]"
+                  >
+                    <td className="px-5 py-2.5">
+                      <Link
+                        href={`/suppliers/${s.id}`}
+                        className="font-medium hover:text-[var(--color-accent)]"
+                      >
+                        {s.company_name}
+                      </Link>
+                    </td>
+                    <td className="px-5 py-2.5 text-[var(--color-text-muted)]">
+                      {[s.city, s.state, s.country !== "US" ? s.country : ""]
+                        .filter(Boolean)
+                        .join(", ")}
+                    </td>
+                    <td className="px-5 py-2.5">
+                      {s.partner_tier ? (
+                        <Badge tone={s.partner_tier.startsWith("P0") ? "danger" : "warning"}>
+                          {s.partner_tier.split(" ")[0]}
+                        </Badge>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-5 py-2.5 text-right tabular-nums font-medium">
+                      {s.partnership_readiness_score}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardBody>
+        </Card>
+      </section>
+
+      <section>
         <Card>
           <CardHeader
             title="Scheduled jobs"

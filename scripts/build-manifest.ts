@@ -91,6 +91,48 @@ type LeadRecord = {
   region: string;
 };
 
+type SupplierRecord = {
+  id: string;
+  company_name: string;
+  company_type: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  phone: string;
+  website: string;
+  email: string;
+  primary_contact_first: string;
+  primary_contact_last: string;
+  primary_contact_title: string;
+  fda_registration_number: string;
+  fda_registration_status: string;
+  dea_registration: string;
+  state_pharmacy_license: string;
+  state_pharmacy_status: string;
+  nabp_accreditation: string;
+  pcab_accreditation: string;
+  iso_certification: string;
+  cgmp_certified: string;
+  last_audit_date: string;
+  products_carried: string;
+  specialties: string;
+  capacity_signal: string;
+  moq: string;
+  pricing_tier_signal: string;
+  ship_to_states: string;
+  ship_to_countries: string;
+  existing_clients_signal: string;
+  partnership_readiness_score: number;
+  partner_tier: string;
+  source_url: string;
+  sourced_at: string;
+  notes: string;
+  verify_queue: string;
+  source_csv: string;
+  category: string;
+};
+
 type CronRecord = {
   task_id: string;
   cron: string;
@@ -116,6 +158,24 @@ const PROSPECTS_ROOT = path.join(
   "outreach",
   "prospect-lists",
 );
+const SUPPLIERS_ROOT = path.join(
+  AI_COMPANY,
+  "_Logs",
+  "supplier-discovery",
+  "extracted",
+);
+
+/** Map CSV filename → category key + display label */
+const SUPPLIER_CSV_CATEGORY: Record<string, string> = {
+  "compounding-pharmacies-503a.csv": "compounding_pharmacy_503a",
+  "compounding-pharmacies-503b.csv": "compounding_pharmacy_503b",
+  "cgmp-peptide-labs-us.csv": "cgmp_peptide_lab_us",
+  "cgmp-peptide-labs-international.csv": "cgmp_peptide_lab_intl",
+  "iv-therapy-suppliers.csv": "iv_therapy_supplier",
+  "exosomes-manufacturers.csv": "exosomes_manufacturer",
+  "sarms-suppliers-research-only.csv": "sarms_supplier",
+  "auxiliary-suppliers.csv": "auxiliary",
+};
 
 /** Department classification ported from build-ai-company-manifest.sh + agent-registry.md */
 function classifyDepartment(slug: string): string {
@@ -607,6 +667,124 @@ async function buildLeads(): Promise<LeadRecord[]> {
   return out;
 }
 
+function supplierSlug(companyName: string, idx: number, csv: string): string {
+  const base = companyName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+    .slice(0, 80);
+  if (base) return base;
+  return `${csv.replace(".csv", "")}-${idx}`;
+}
+
+/** The source CSVs occasionally have shifted column counts (extra commas).
+ *  Recover the partner_tier (P0-P3) + readiness score by scanning all values when
+ *  the canonical columns are nonsense. */
+function normalizeSupplierRow(row: Record<string, string>): {
+  partner_tier: string;
+  partnership_readiness_score: number;
+} {
+  const values = Object.values(row);
+  let tier = (row.partner_tier || "").trim();
+  let score = Number(row.partnership_readiness_score);
+  const tierRe = /^P[0-3](?:\s|$)/;
+  if (!tierRe.test(tier)) {
+    for (const v of values) {
+      const s = String(v || "").trim();
+      const m = s.match(/^(P[0-3])(\b|$)/);
+      if (m) {
+        tier = s;
+        break;
+      }
+    }
+  }
+  if (!Number.isFinite(score) || score < 0 || score > 100) {
+    for (const v of values) {
+      const n = Number(String(v || "").trim());
+      if (Number.isFinite(n) && n >= 30 && n <= 100) {
+        score = n;
+        break;
+      }
+    }
+  }
+  if (!Number.isFinite(score)) score = 0;
+  return { partner_tier: tier, partnership_readiness_score: score };
+}
+
+async function buildSuppliers(): Promise<SupplierRecord[]> {
+  const out: SupplierRecord[] = [];
+  let files: string[] = [];
+  try {
+    files = (await fs.readdir(SUPPLIERS_ROOT)).filter(
+      (f) =>
+        f.endsWith(".csv") &&
+        !f.includes("-excluded-") &&
+        SUPPLIER_CSV_CATEGORY[f],
+    );
+  } catch {
+    return out;
+  }
+  const seen = new Map<string, number>();
+  for (const f of files) {
+    const category = SUPPLIER_CSV_CATEGORY[f] || "other";
+    const raw = await fs.readFile(path.join(SUPPLIERS_ROOT, f), "utf-8");
+    const parsed = Papa.parse<Record<string, string>>(raw, {
+      header: true,
+      skipEmptyLines: true,
+    });
+    parsed.data.forEach((row, i) => {
+      if (!row.company_name) return;
+      let slug = supplierSlug(row.company_name, i, f);
+      const seenCount = seen.get(slug) || 0;
+      if (seenCount > 0) slug = `${slug}-${seenCount + 1}`;
+      seen.set(slug, seenCount + 1);
+      const norm = normalizeSupplierRow(row);
+      out.push({
+        id: slug,
+        company_name: row.company_name || "",
+        company_type: row.company_type || category,
+        address: row.address || "",
+        city: row.city || "",
+        state: row.state || "",
+        country: row.country || "",
+        phone: row.phone || "",
+        website: row.website || "",
+        email: row.email || "",
+        primary_contact_first: row.primary_contact_first || "",
+        primary_contact_last: row.primary_contact_last || "",
+        primary_contact_title: row.primary_contact_title || "",
+        fda_registration_number: row.fda_registration_number || "",
+        fda_registration_status: row.fda_registration_status || "",
+        dea_registration: row.dea_registration || "",
+        state_pharmacy_license: row.state_pharmacy_license || "",
+        state_pharmacy_status: row.state_pharmacy_status || "",
+        nabp_accreditation: row.nabp_accreditation || "",
+        pcab_accreditation: row.pcab_accreditation || "",
+        iso_certification: row.iso_certification || "",
+        cgmp_certified: row.cgmp_certified || "",
+        last_audit_date: row.last_audit_date || "",
+        products_carried: row.products_carried || "",
+        specialties: row.specialties || "",
+        capacity_signal: row.capacity_signal || "",
+        moq: row.moq || "",
+        pricing_tier_signal: row.pricing_tier_signal || "",
+        ship_to_states: row.ship_to_states || "",
+        ship_to_countries: row.ship_to_countries || "",
+        existing_clients_signal: row.existing_clients_signal || "",
+        partnership_readiness_score: norm.partnership_readiness_score,
+        partner_tier: norm.partner_tier || "",
+        source_url: row.source_url || "",
+        sourced_at: row.sourced_at || "",
+        notes: row.notes || "",
+        verify_queue: row.verify_queue || "",
+        source_csv: f,
+        category,
+      });
+    });
+  }
+  return out;
+}
+
 async function buildCrons(): Promise<CronRecord[]> {
   const out: CronRecord[] = [];
   let entries: string[] = [];
@@ -716,6 +894,21 @@ async function main() {
   const leads = await buildLeads();
   console.log(`[manifest] read ${leads.length} leads`);
 
+  console.log("[manifest] reading suppliers...");
+  const suppliers = await buildSuppliers();
+  console.log(`[manifest] read ${suppliers.length} suppliers`);
+
+  const supplierCategoryCounts: Record<string, number> = {};
+  const supplierTierCounts: Record<string, number> = {};
+  for (const s of suppliers) {
+    supplierCategoryCounts[s.category] =
+      (supplierCategoryCounts[s.category] || 0) + 1;
+    if (s.partner_tier) {
+      supplierTierCounts[s.partner_tier] =
+        (supplierTierCounts[s.partner_tier] || 0) + 1;
+    }
+  }
+
   console.log("[manifest] reading scheduled-tasks crons...");
   const crons = await buildCrons();
   console.log(`[manifest] read ${crons.length} crons`);
@@ -728,13 +921,17 @@ async function main() {
       workflows: workflows.length,
       departments: departments.length,
       leads: leads.length,
+      suppliers: suppliers.length,
       crons: crons.length,
       approvals: APPROVALS_SEED.length,
+      supplier_categories: supplierCategoryCounts,
+      supplier_tiers: supplierTierCounts,
     },
     departments,
     skills,
     workflows,
     leads,
+    suppliers,
     crons,
     approvals: APPROVALS_SEED,
   };

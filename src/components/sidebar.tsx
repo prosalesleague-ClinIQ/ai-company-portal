@@ -9,6 +9,7 @@ import {
   Layers,
   GitBranch,
   Users,
+  Factory,
   CheckSquare,
   Clock,
   Search,
@@ -23,12 +24,13 @@ const NAV = [
   { href: "/skills", label: "Skills", icon: Layers, key: "skills" },
   { href: "/workflows", label: "Workflows", icon: GitBranch, key: "workflows" },
   { href: "/leads", label: "Leads", icon: Users, key: "leads" },
+  { href: "/suppliers", label: "Suppliers", icon: Factory, key: "suppliers" },
   { href: "/approvals", label: "Approvals", icon: CheckSquare, key: "approvals" },
   { href: "/cron", label: "Scheduled", icon: Clock, key: "crons" },
   { href: "/search", label: "Search", icon: Search, key: "search" },
 ] as const;
 
-type StatsMap = Record<string, number>;
+type StatsMap = Record<string, number | Record<string, number>>;
 
 export function Sidebar({
   stats,
@@ -81,7 +83,8 @@ export function Sidebar({
           const active =
             item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           const Icon = item.icon;
-          const count = stats[item.key];
+          const rawCount = stats[item.key];
+          const count = typeof rawCount === "number" ? rawCount : undefined;
           return (
             <Link
               key={item.href}

@@ -64,6 +64,48 @@ export type Lead = {
   region: string;
 };
 
+export type Supplier = {
+  id: string;
+  company_name: string;
+  company_type: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  phone: string;
+  website: string;
+  email: string;
+  primary_contact_first: string;
+  primary_contact_last: string;
+  primary_contact_title: string;
+  fda_registration_number: string;
+  fda_registration_status: string;
+  dea_registration: string;
+  state_pharmacy_license: string;
+  state_pharmacy_status: string;
+  nabp_accreditation: string;
+  pcab_accreditation: string;
+  iso_certification: string;
+  cgmp_certified: string;
+  last_audit_date: string;
+  products_carried: string;
+  specialties: string;
+  capacity_signal: string;
+  moq: string;
+  pricing_tier_signal: string;
+  ship_to_states: string;
+  ship_to_countries: string;
+  existing_clients_signal: string;
+  partnership_readiness_score: number;
+  partner_tier: string;
+  source_url: string;
+  sourced_at: string;
+  notes: string;
+  verify_queue: string;
+  source_csv: string;
+  category: string;
+};
+
 export type Cron = {
   task_id: string;
   cron: string;
@@ -88,13 +130,17 @@ export type Manifest = {
     workflows: number;
     departments: number;
     leads: number;
+    suppliers: number;
     crons: number;
     approvals: number;
+    supplier_categories: Record<string, number>;
+    supplier_tiers: Record<string, number>;
   };
   departments: Department[];
   skills: Skill[];
   workflows: Workflow[];
   leads: Lead[];
+  suppliers: Supplier[];
   crons: Cron[];
   approvals: Approval[];
 };
