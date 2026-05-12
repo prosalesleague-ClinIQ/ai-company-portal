@@ -175,6 +175,13 @@ const SUPPLIER_CSV_CATEGORY: Record<string, string> = {
   "exosomes-manufacturers.csv": "exosomes_manufacturer",
   "sarms-suppliers-research-only.csv": "sarms_supplier",
   "auxiliary-suppliers.csv": "auxiliary",
+  // Wave 2 (2026-05-12) — new supplier categories
+  "testosterone-dea-suppliers.csv": "testosterone_dea_supplier",
+  "glp1-redundancy-suppliers.csv": "glp1_redundancy_supplier",
+  "glp1-emerging-alternatives.csv": "glp1_emerging_alternative",
+  "sterile-fill-finish-cdmos.csv": "sterile_fill_finish_cdmo",
+  "peptide-raw-material-distributors-cgmp.csv": "peptide_raw_distributor_cgmp",
+  "peptide-raw-material-distributors-research.csv": "peptide_raw_distributor_research",
 };
 
 /** Department classification ported from build-ai-company-manifest.sh + agent-registry.md */
