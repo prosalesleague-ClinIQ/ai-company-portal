@@ -5,7 +5,6 @@
   "scripts": {
     "rebuild": "tsx scripts/build-manifest.ts",
     "dev": "next dev",
-    "prebuild": "tsx scripts/build-manifest.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

@@ -14,6 +14,7 @@ export type Skill = {
   estimated_time: string;
   path: string;
   status: string;
+  body_html: string;
 };
 
 export type Workflow = {
@@ -21,6 +22,7 @@ export type Workflow = {
   name: string;
   description: string;
   path: string;
+  body_html: string;
 };
 
 export type Department = {

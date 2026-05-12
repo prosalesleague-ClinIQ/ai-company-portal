@@ -14,6 +14,14 @@ import path from "node:path";
 import os from "node:os";
 import matter from "gray-matter";
 import Papa from "papaparse";
+import { remark } from "remark";
+import remarkGfm from "remark-gfm";
+import remarkHtml from "remark-html";
+
+async function md2html(md: string): Promise<string> {
+  const file = await remark().use(remarkGfm).use(remarkHtml).process(md);
+  return String(file);
+}
 
 const AI_COMPANY =
   process.env.AI_COMPANY_PATH || "/Users/christomac/Projects/AI Company";
@@ -33,6 +41,7 @@ type SkillRecord = {
   estimated_time: string;
   path: string;
   status: string;
+  body_html: string;
 };
 
 type WorkflowRecord = {
@@ -40,6 +49,7 @@ type WorkflowRecord = {
   name: string;
   description: string;
   path: string;
+  body_html: string;
 };
 
 type DepartmentRecord = {
@@ -385,14 +395,14 @@ async function findAllSkillFiles(): Promise<string[]> {
 async function readSkillFromFile(filePath: string): Promise<SkillRecord | null> {
   try {
     const raw = await fs.readFile(filePath, "utf-8");
-    const { data } = matter(raw);
-    // slug comes from frontmatter name OR parent directory name
+    const { data, content } = matter(raw);
     const parentDir = path.basename(path.dirname(filePath));
     const slug = String(data.name || parentDir).toLowerCase().replace(/[^a-z0-9-]/g, "-");
     const dept = classifyDepartment(slug);
     const displayName = String(data.name || parentDir)
       .replace(/-/g, " ")
       .replace(/\b\w/g, (c) => c.toUpperCase());
+    const body_html = await md2html(content);
     return {
       slug,
       name: displayName,
@@ -406,6 +416,7 @@ async function readSkillFromFile(filePath: string): Promise<SkillRecord | null> 
       estimated_time: String(data.estimated_time || ""),
       path: path.relative(AI_COMPANY, filePath),
       status: "active",
+      body_html,
     };
   } catch {
     return null;
@@ -451,6 +462,7 @@ async function buildWorkflows(): Promise<WorkflowRecord[]> {
           .trim(),
       description: blockquote || "Workflow.",
       path: path.relative(AI_COMPANY, filePath),
+      body_html: await md2html(raw),
     });
   }
   return out.sort((a, b) => a.name.localeCompare(b.name));

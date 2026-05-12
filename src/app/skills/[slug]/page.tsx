@@ -1,14 +1,7 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import matter from "gray-matter";
 import { getManifest } from "@/lib/manifest";
 import { Card, CardBody, CardHeader, Badge } from "@/components/ui/card";
-import { renderMarkdown } from "@/lib/markdown";
-
-const AI_COMPANY =
-  process.env.AI_COMPANY_PATH || "/Users/christomac/Projects/AI Company";
 
 export async function generateStaticParams() {
   const m = await getManifest();
@@ -25,16 +18,7 @@ export default async function SkillDetailPage({
   const skill = m.skills.find((s) => s.slug === slug);
   if (!skill) notFound();
 
-  let body = "";
-  try {
-    const filePath = path.join(AI_COMPANY, skill.path);
-    const raw = await fs.readFile(filePath, "utf-8");
-    const { content } = matter(raw);
-    body = await renderMarkdown(content);
-  } catch (e) {
-    body = `<p>Could not load SKILL.md body. (${String(e)})</p>`;
-  }
-
+  const body = skill.body_html || "<p>No body content captured.</p>";
   const dept = m.departments.find((d) => d.slug === skill.department);
 
   return (

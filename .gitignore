@@ -8,4 +8,6 @@ dist
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store
-public/manifest.json
+# Manifest is committed so Vercel can build without filesystem access
+# Rebuild locally with `npm run rebuild` then commit.
+# public/manifest.json
