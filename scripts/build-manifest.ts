@@ -392,10 +392,45 @@ async function findAllSkillFiles(): Promise<string[]> {
   return found;
 }
 
+/** Tolerant frontmatter parse: if YAML is malformed, do a best-effort regex extraction
+ *  rather than dropping the skill entirely. */
+function tolerantFrontmatter(raw: string): { data: Record<string, unknown>; content: string } {
+  try {
+    const parsed = matter(raw);
+    return { data: parsed.data as Record<string, unknown>, content: parsed.content };
+  } catch {
+    // Best-effort: pull `name:`, `description:`, `type:`, `theme:`, `estimated_time:`
+    const match = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+    if (!match) return { data: {}, content: raw };
+    const fmRaw = match[1];
+    const content = match[2];
+    const data: Record<string, unknown> = {};
+    const grab = (key: string) => {
+      const re = new RegExp(`^${key}:\\s*(.+)$`, "m");
+      const m2 = fmRaw.match(re);
+      if (m2) data[key] = m2[1].trim().replace(/^["']|["']$/g, "");
+    };
+    for (const k of ["name", "description", "type", "theme", "estimated_time", "intent"]) grab(k);
+    // triggers + best_for: collect lines under the key
+    const listKey = (key: string): string[] => {
+      const re = new RegExp(`^${key}:\\s*\\n((?:\\s*-\\s.+\\n?)+)`, "m");
+      const m2 = fmRaw.match(re);
+      if (!m2) return [];
+      return m2[1]
+        .split("\n")
+        .map((l) => l.replace(/^\s*-\s*/, "").trim().replace(/^["']|["']$/g, ""))
+        .filter(Boolean);
+    };
+    data.triggers = listKey("triggers");
+    data.best_for = listKey("best_for");
+    return { data, content };
+  }
+}
+
 async function readSkillFromFile(filePath: string): Promise<SkillRecord | null> {
   try {
     const raw = await fs.readFile(filePath, "utf-8");
-    const { data, content } = matter(raw);
+    const { data, content } = tolerantFrontmatter(raw);
     const parentDir = path.basename(path.dirname(filePath));
     const slug = String(data.name || parentDir).toLowerCase().replace(/[^a-z0-9-]/g, "-");
     const dept = classifyDepartment(slug);
@@ -411,14 +446,15 @@ async function readSkillFromFile(filePath: string): Promise<SkillRecord | null> 
       type: String(data.type || "specialist"),
       theme: String(data.theme || ""),
       department: dept,
-      triggers: Array.isArray(data.triggers) ? data.triggers.map(String) : [],
-      best_for: Array.isArray(data.best_for) ? data.best_for.map(String) : [],
+      triggers: Array.isArray(data.triggers) ? (data.triggers as string[]).map(String) : [],
+      best_for: Array.isArray(data.best_for) ? (data.best_for as string[]).map(String) : [],
       estimated_time: String(data.estimated_time || ""),
       path: path.relative(AI_COMPANY, filePath),
       status: "active",
       body_html,
     };
-  } catch {
+  } catch (e) {
+    console.warn(`[manifest] skip ${filePath}: ${String(e).slice(0, 80)}`);
     return null;
   }
 }
