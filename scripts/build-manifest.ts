@@ -185,6 +185,11 @@ const SUPPLIERS_ROOT = path.join(
   "extracted",
 );
 const KB_ROOT = path.join(AI_COMPANY, "_Knowledge Base", "Matrix Domain");
+const KB_PEPTIDES_LIBRARY = path.join(
+  AI_COMPANY,
+  "_Knowledge Base",
+  "peptides-library",
+);
 
 const KB_SECTION_LABELS: Record<string, string> = {
   peptides: "Peptides",
@@ -197,6 +202,23 @@ const KB_SECTION_LABELS: Record<string, string> = {
   "voice-snippets": "Voice Snippets",
   "compliance-safe-phrasing": "Compliance-Safe Phrasing",
   root: "Overview",
+  // Peptides library (top-level _Knowledge Base/peptides-library/) — 15 therapeutic categories + master files
+  "peptides-library": "Peptides Library — Master",
+  antimicrobial: "Peptides Library — Antimicrobial",
+  bone: "Peptides Library — Bone",
+  cosmetic: "Peptides Library — Cosmetic",
+  diabetes: "Peptides Library — Diabetes",
+  experimental: "Peptides Library — Experimental",
+  ghs: "Peptides Library — GH Secretagogues",
+  gi: "Peptides Library — GI",
+  healing: "Peptides Library — Healing",
+  "immune-longevity": "Peptides Library — Immune / Longevity",
+  metabolic: "Peptides Library — Metabolic",
+  mitochondrial: "Peptides Library — Mitochondrial",
+  neuroendocrine: "Peptides Library — Neuroendocrine",
+  nootropic: "Peptides Library — Nootropic",
+  "sexual-health": "Peptides Library — Sexual Health",
+  therapeutic: "Peptides Library — Therapeutic",
 };
 
 /** Map CSV filename → category key + display label */
@@ -950,6 +972,10 @@ async function buildKBDocs(): Promise<KBDocRecord[]> {
   }
 
   await walk(KB_ROOT, "root");
+  // Also scan _Knowledge Base/peptides-library/ (top-level, sibling to Matrix Domain).
+  // Master files in the library root use "peptides-library" section; each therapeutic
+  // sub-folder uses its own section (antimicrobial / bone / cosmetic / etc.).
+  await walk(KB_PEPTIDES_LIBRARY, "peptides-library");
   // Deduplicate slug collisions across sections by prefixing section.
   const seen = new Map<string, number>();
   for (const doc of out) {
